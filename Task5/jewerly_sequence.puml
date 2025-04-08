@@ -1,0 +1,57 @@
+@startuml
+actor Operator
+
+queue RabbitMQ as Queue
+
+participant MES
+participant Cache
+participant DB
+
+
+Operator -> MES : order <id> status request
+activate MES
+
+MES -> Cache : seek order <id>
+activate Cache
+
+
+Cache -> MES : order <id> status
+
+alt
+note over MES, DB : Иногда возможны ситуации cache miss
+Cache -> DB : order <id> status
+activate DB
+
+DB -> Cache : order <id> status
+deactivate DB
+
+
+Cache -> MES : order <id> status
+deactivate Cache
+
+end
+
+MES -> Operator : order <id> status
+deactivate MES
+
+note over Operator, DB : Запись БД производится синхронно, чтобы гарантировать передачу заказа в производство
+
+Operator -> MES : order <id> manufacturing started
+activate MES
+
+MES -> Cache : change status
+activate Cache
+
+Cache -> DB : change status
+activate DB
+
+DB -> Cache : status changed
+deactivate DB
+
+Cache -> MES : status changed
+deactivate Cache
+
+MES -> Queue : order <id> manufacturing status
+deactivate MES
+ 
+@enduml
